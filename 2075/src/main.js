@@ -9,7 +9,7 @@ const video = document.getElementById("cam");
 const canvas = document.getElementById("skeleton");
 const debug = document.getElementById("debug");
 const hud = createHud(document.getElementById("hud"));
-
+window.addEventListener('mousemove', (e) => enemy.setPlayerX(e.clientX / window.innerWidth));
 async function init() {
   // ---- Real enemy (Person B) ----
   const arena = createArena(document.getElementById("stage"));
@@ -40,6 +40,8 @@ async function init() {
       const result = pose.detectForVideo(video, now);
       drawSkeleton(canvas, result);
       moves.update(result.landmarks?.[0], result.worldLandmarks?.[0], now, aspect);
+      const lm = result.landmarks?.[0];
+      if (lm) enemy.setPlayerX(1 - (lm[11].x + lm[12].x) / 2);
       game.tick(now);
 
       debug.textContent = [
