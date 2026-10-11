@@ -1,16 +1,37 @@
-import { startCamera, createPose, drawSkeleton, LM } from "./player/pose.js";
+import { startCamera, createPose, drawSkeleton } from "./player/pose.js";
+import { createMoveDetector } from "./player/moves.js";
 
 const video = document.getElementById("cam");
 const canvas = document.getElementById("skeleton");
 const debug = document.getElementById("debug");
 
-export const player = { landmarks: null, t: 0 }; // detection code reads this next
+// Fake enemy for now: swap for Person B's real one at the checkpoint
+export const enemy = {
+  playMove: (m) => console.log("enemy.playMove", m),
+  takeHit: () => console.log("enemy.takeHit"),
+  say: (text) => console.log("enemy.say", text),
+  onStrike: (cb) => { window.__strike = cb; }, // call __strike() in the console to simulate
+};
+
+let lastPunch = { hand: "-", t: -Infinity };
+const moves = createMoveDetector({
+  onPunch: (p) => {
+    lastPunch = p;
+    console.log("PUNCH", p.hand);
+  },
+});
+
+window.addEventListener("keydown", (e) => {
+  if (e.key.toLowerCase() === "c") moves.startCalibration();
+});
 
 async function init() {
   await startCamera(video);
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
+  const aspect = video.videoWidth / video.videoHeight;
   const pose = await createPose();
+  const s = moves.state;
 
   let lastVideoTime = -1;
   function loop() {
@@ -18,13 +39,18 @@ async function init() {
       lastVideoTime = video.currentTime;
       const now = performance.now();
       const result = pose.detectForVideo(video, now);
-      player.landmarks = result.landmarks?.[0] ?? null;
-      player.t = now;
       drawSkeleton(canvas, result);
-      if (player.landmarks) {
-        const w = player.landmarks[LM.R_WRIST];
-        debug.textContent = `R wrist x:${w.x.toFixed(2)} y:${w.y.toFixed(2)} z:${w.z.toFixed(2)}`;
-      }
+      moves.update(result.landmarks?.[0], result.worldLandmarks?.[0], now, aspect);
+
+      const recent = now - lastPunch.t < 300 ? `PUNCH ${lastPunch.hand.toUpperCase()}` : "";
+      debug.textContent = [
+        s.calibrated ? "calibrated" : `PRESS C to calibrate (guard stance)  ${(s.calibProgress * 100) | 0}%`,
+        `tracking: ${s.tracking}`,
+        `ext L:${s.ext.left.toFixed(2)} R:${s.ext.right.toFixed(2)}`,
+        `block: ${s.blocking}   dodge: ${s.dodge}`,
+        `lateral:${s.lateral.toFixed(2)} duck:${s.duck.toFixed(2)}`,
+        recent,
+      ].join("\n");
     }
     requestAnimationFrame(loop);
   }
