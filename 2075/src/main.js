@@ -1,8 +1,5 @@
 import './style.css';
 import { createArena, createEnemy } from './enemy.js';
-
-const arena = createArena(document.getElementById('stage'));
-createEnemy(arena);
 import { startCamera, createPose, drawSkeleton } from "./player/pose.js";
 import { createMoveDetector } from "./player/moves.js";
 import { createHud } from "./player/hud.js";
@@ -13,27 +10,20 @@ const canvas = document.getElementById("skeleton");
 const debug = document.getElementById("debug");
 const hud = createHud(document.getElementById("hud"));
 
-// ---- Fake enemy: swap for Person B's real one at the checkpoint ----
-let strikeCb = () => {};
-const enemy = {
-  playMove(m) {
-  console.log("enemy.playMove", m);
-  hud.showSubtitle(`⚠ ${m.toUpperCase()}!`, 500);
-  setTimeout(() => strikeCb({ move: m }), 600);
-},
-  takeHit() { console.log("enemy.takeHit"); },
-  say(text) { hud.showSubtitle(text); },
-  onStrike(cb) { strikeCb = cb; },
-};
-
-let game; // set below, since moves needs to call game.handlePunch
-const moves = createMoveDetector({ onPunch: (p) => game.handlePunch(p) });
-game = createGame({
-  enemy, moves, hud,
-  onEvent: (name, data) => console.log("[game]", name, data),
-});
-
 async function init() {
+  // ---- Real enemy (Person B) ----
+  const arena = createArena(document.getElementById("stage"));
+  const enemy = await createEnemy(arena);
+  enemy.say = (text) => hud.showSubtitle(text); // temporary until the voice step
+
+  // ---- Game (Person A) ----
+  let game; // set below, since moves needs to call game.handlePunch
+  const moves = createMoveDetector({ onPunch: (p) => game.handlePunch(p) });
+  game = createGame({
+    enemy, moves, hud,
+    onEvent: (name, data) => console.log("[game]", name, data),
+  });
+
   await startCamera(video);
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
