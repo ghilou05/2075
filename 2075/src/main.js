@@ -1,3 +1,8 @@
+import './style.css';
+import { createArena, createEnemy } from './enemy.js';
+
+const arena = createArena(document.getElementById('stage'));
+createEnemy(arena);
 import { startCamera, createPose, drawSkeleton } from "./player/pose.js";
 import { createMoveDetector } from "./player/moves.js";
 import { createHud } from "./player/hud.js";
