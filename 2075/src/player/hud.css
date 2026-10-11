@@ -1,0 +1,16 @@
+#hud { position: absolute; inset: 0; pointer-events: none; z-index: 10; font-family: system-ui, sans-serif; color: #fff; }
+.bars { position: absolute; top: 16px; left: 16px; right: 16px; display: flex; justify-content: space-between; gap: 40px; }
+.bar { flex: 1; background: rgba(0,0,0,.55); border: 2px solid #fff; height: 28px; position: relative; }
+.bar span { position: absolute; left: 8px; top: 3px; font-weight: 700; font-size: 14px; z-index: 1; }
+.bar .fill { height: 100%; width: 100%; background: #3ddc84; transition: width .25s; }
+.bar.enemy .fill { background: #ff4d4d; margin-left: auto; }
+#round { position: absolute; top: 52px; width: 100%; text-align: center; font-weight: 700; text-shadow: 0 0 6px #000; }
+#subtitle { position: absolute; bottom: 40px; width: 100%; text-align: center; font-size: 28px; font-weight: 700; text-shadow: 0 0 8px #000, 0 0 8px #000; padding: 0 60px; box-sizing: border-box; }
+#flash { position: absolute; inset: 0; opacity: 0; transition: opacity .35s; }
+#flash.hit { background: rgba(255,0,0,.35); opacity: 1; transition: none; }
+#flash.block { background: rgba(80,160,255,.3); opacity: 1; transition: none; }
+#flash.dodge { background: rgba(255,255,255,.2); opacity: 1; transition: none; }
+#overlay { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,.65); text-align: center; }
+#overlay h1 { font-size: 64px; margin: 0 0 8px; }
+#overlay p { font-size: 24px; margin: 0 0 24px; }
+#overlay button { pointer-events: auto; font-size: 24px; padding: 12px 36px; cursor: pointer; border: 0; border-radius: 8px; background: #ffd23f; font-weight: 700; }
