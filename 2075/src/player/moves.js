@@ -129,14 +129,22 @@ export function createMoveDetector({ onPunch = () => {} } = {}) {
     }
 
     // ---- Dodge: head moves sideways or drops, relative to calibrated spot
-    // Camera x is unmirrored, so flip it: positive lateral = moving right ON SCREEN
-    state.lateral = (-(nose.x - cal.noseX) * aspect) / sw;
-    state.duck = (nose.y - cal.noseY) / sw;
-    state.dodge =
-      state.lateral > CFG.DODGE_X ? "right"
-      : state.lateral < -CFG.DODGE_X ? "left"
-      : state.duck > CFG.DUCK_Y ? "duck"
-      : null;
+    // Skipped while guarding - raising your hands to block tucks the chin down
+    // enough to look like a duck, so block and dodge would otherwise both fire.
+    if (blockPose) {
+      state.lateral = 0;
+      state.duck = 0;
+      state.dodge = null;
+    } else {
+      // Camera x is unmirrored, so flip it: positive lateral = moving right ON SCREEN
+      state.lateral = (-(nose.x - cal.noseX) * aspect) / sw;
+      state.duck = (nose.y - cal.noseY) / sw;
+      state.dodge =
+        state.lateral > CFG.DODGE_X ? "right"
+        : state.lateral < -CFG.DODGE_X ? "left"
+        : state.duck > CFG.DUCK_Y ? "duck"
+        : null;
+    }
 
     return state;
   }

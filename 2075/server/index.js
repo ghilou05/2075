@@ -75,4 +75,31 @@ app.post('/api/ai-turn', async (req, res) => {
   }
 });
 
+app.post('/api/speak', async (req, res) => {
+  const text = String(req.body?.text ?? '').slice(0, 200);
+
+  try {
+    const r = await fetch(
+      `https://api.elevenlabs.io/v1/text-to-speech/${process.env.ELEVENLABS_VOICE_ID}?output_format=mp3_44100_128`,
+      {
+        method: 'POST',
+        headers: {
+          'xi-api-key': process.env.ELEVENLABS_API_KEY,
+          'Content-Type': 'application/json',
+          Accept: 'audio/mpeg',
+        },
+        body: JSON.stringify({ text, model_id: 'eleven_flash_v2_5' }),
+        signal: AbortSignal.timeout(15000),
+      },
+    );
+    if (!r.ok) throw new Error(`ElevenLabs ${r.status}: ${await r.text()}`);
+
+    res.set('Content-Type', 'audio/mpeg');
+    res.send(Buffer.from(await r.arrayBuffer()));
+  } catch (err) {
+    console.error('Speak failed:', err.message);
+    res.status(502).end();
+  }
+});
+
 app.listen(3001, () => console.log('AI server on http://localhost:3001'));

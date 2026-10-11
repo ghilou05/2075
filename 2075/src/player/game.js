@@ -12,6 +12,10 @@ export const GAME = {
   ROUND_PAUSE_MS: 2500,
 };
 
+// enemy.js only knows jab/hook/uppercut (no "heavy"/"feint", no fake flag) -
+// map the AI's move names onto real ones so every AI turn does something visible.
+const AI_MOVE_MAP = { jab: "jab", heavy: "uppercut", feint: "jab" };
+
 export function createGame({ enemy, moves, hud, chooseMove, onEvent = () => {} }) {
   const moveNames = Object.keys(GAME.ENEMY_DMG);
   const pick = chooseMove ?? (() => moveNames[Math.floor(Math.random() * moveNames.length)]);
@@ -20,10 +24,16 @@ export function createGame({ enemy, moves, hud, chooseMove, onEvent = () => {} }
     phase: "idle", // idle | calibrating | fighting | roundOver | matchOver
     playerHp: GAME.MAX_HP, enemyHp: GAME.MAX_HP,
     round: 1, wins: { player: 0, enemy: 0 },
-    stats: { punches: { left: 0, right: 0 }, strikesFaced: 0, blocked: 0, dodged: 0, hit: 0 },
+    stats: { punches: { left: 0, right: 0 }, strikesFaced: 0, blocked: 0, dodged: 0, hit: 0, stepBacks: 0 },
   };
   let attackTimer = null;
   let lastBlockT = -Infinity;
+  let prevDodge = null;
+
+  // AI integration state
+  let aiQueue = [];
+  let blockChance = 0;
+  let aiRequestInFlight = false;
 
   // Person B reads this to build the AI prompt
   function getFightState() {
@@ -32,8 +42,32 @@ export function createGame({ enemy, moves, hud, chooseMove, onEvent = () => {} }
       playerHp: g.playerHp, enemyHp: g.enemyHp, round: g.round,
       blockRate: s.strikesFaced ? s.blocked / s.strikesFaced : 0,
       dodgeRate: s.strikesFaced ? s.dodged / s.strikesFaced : 0,
+      stepBacks: s.stepBacks,
       favouredHand: l > r ? "left" : r > l ? "right" : "even",
     };
+  }
+
+  async function requestAiTurn() {
+    if (aiRequestInFlight) return;
+    aiRequestInFlight = true;
+    try {
+      const res = await fetch("/api/ai-turn", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(getFightState()),
+        signal: AbortSignal.timeout(6000),
+      });
+      if (!res.ok) return;
+      const turn = await res.json();
+      console.log("[ai] moves=", turn.moves, "taunt=", turn.taunt);
+      for (const m of turn.moves ?? []) aiQueue.push(AI_MOVE_MAP[m] ?? m);
+      if (typeof turn.block_chance === "number") blockChance = turn.block_chance;
+      if (turn.taunt) enemy.say(turn.taunt);
+    } catch {
+      // server down/slow/timed out - keep fighting with random moves
+    } finally {
+      aiRequestInFlight = false;
+    }
   }
 
   const refresh = () => {
@@ -46,7 +80,10 @@ export function createGame({ enemy, moves, hud, chooseMove, onEvent = () => {} }
     const [lo, hi] = GAME.ATTACK_GAP_MS;
     attackTimer = setTimeout(() => {
       if (g.phase !== "fighting") return;
-      enemy.playMove(pick(getFightState()));
+      if (aiQueue.length < 2) requestAiTurn(); // fire-and-forget, never block the fight
+      const move = aiQueue.length ? aiQueue.shift() : pick(getFightState());
+      enemy.setBlocking(Math.random() < blockChance);
+      enemy.playMove(move);
       scheduleAttack();
     }, lo + Math.random() * (hi - lo));
   }
@@ -117,18 +154,23 @@ export function createGame({ enemy, moves, hud, chooseMove, onEvent = () => {} }
     await hud.sleep(1200);
     hud.hideMessage();
     g.phase = "fighting";
+    requestAiTurn(); // fire-and-forget, never block the fight
     scheduleAttack();
   }
 
   // Call every frame, after moves.update()
   function tick(now) {
     if (moves.state.blocking) lastBlockT = now;
+    const d = moves.state.dodge;
+    if (d && !prevDodge) g.stats.stepBacks++; // edge-triggered so holding a dodge counts once
+    prevDodge = d;
   }
 
   async function begin() {
     g.phase = "calibrating";
     g.round = 1; g.wins = { player: 0, enemy: 0 };
-    g.stats = { punches: { left: 0, right: 0 }, strikesFaced: 0, blocked: 0, dodged: 0, hit: 0 };
+    g.stats = { punches: { left: 0, right: 0 }, strikesFaced: 0, blocked: 0, dodged: 0, hit: 0, stepBacks: 0 };
+    aiQueue = []; blockChance = 0;
     for (let i = 3; i > 0; i--) {
       hud.showMessage("Get in your guard stance", String(i));
       await hud.sleep(1000);

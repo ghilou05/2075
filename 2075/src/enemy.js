@@ -5,14 +5,18 @@ export const MOVES = {
   jab: { windup: 500, damage: 8 },
   hook: { windup: 1000, damage: 12 },
   uppercut: { windup: 1300, damage: 15 },
+  feint: { windup: 600, damage: 0, fake: true },
 };
+
+// The AI server sends "heavy"; map it to one of our moves so it isn't ignored
+const MOVE_ALIASES = { heavy: "uppercut" };
 
 const STRIKE_DELAY = 250;
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const FACING = -1.2; // radians; turned to face left, not fully side-on
-const HOME_GAP = 1.1; // distance he keeps between attacks
-const STRIKE_GAP = 0.5; // distance he attacks from
-const REACH = 0.75; // max distance for any hit to land, his or yours
+const HOME_GAP = 1.7; // was 1.1
+const STRIKE_GAP = 1.1; // was 0.5
+const REACH = 1.4; // was 0.75
 const WALK_SPEED = 1.6; // units per second
 const MIN_X = -2.2; // screen edges, so he can't walk off
 const MAX_X = 2.2;
@@ -230,14 +234,21 @@ export async function createEnemy(arena, { height = 1.8 } = {}) {
       }
     }
   });
-  const strikeListeners = new Set();
 
+  const strikeListeners = new Set();
   function onStrike(fn) {
     strikeListeners.add(fn);
     return () => strikeListeners.delete(fn);
   }
 
-  async function playMove(name) {
+  const whiffListeners = new Set();
+  function onWhiff(fn) {
+    whiffListeners.add(fn);
+    return () => whiffListeners.delete(fn);
+  }
+
+  async function playMove(requested) {
+    const name = MOVE_ALIASES[requested] ?? requested;
     const move = MOVES[name];
     if (!move || state !== "idle") return false;
 
@@ -247,12 +258,12 @@ export async function createEnemy(arena, { height = 1.8 } = {}) {
     await until(() => distance() <= STRIKE_GAP + 0.1, 2000);
     if (state !== "approach") return false;
 
-    // 1. Telegraph (planted, can't move)
+    // 1. Telegraph (planted, can't move). Slower moves glow brighter
     state = "windup";
     actions.Walking.timeScale = 1;
     playAnim("Idle");
     target.lean = -0.18;
-    target.glow = name === "heavy" ? 0.9 : 0.55;
+    target.glow = move.windup >= 1000 ? 0.9 : 0.55;
     await wait(move.windup);
     if (state !== "windup") return false;
 
@@ -264,16 +275,20 @@ export async function createEnemy(arena, { height = 1.8 } = {}) {
       const duration = playAnim("No", { once: true });
       await wait(Math.min(duration, 900));
     } else {
-      // 2b. Strike: only lands if the player is still in range
+      // 2b. Strike: lands if the player is in range, whiffs if they stepped back
       state = "strike";
       target.lean = 0.12;
-      target.z = 0.45;
+      target.z = 0.3;
       target.glow = 0;
       const duration = playAnim("Punch", { once: true, fade: 0.08 });
       await wait(STRIKE_DELAY);
-      if (state === "strike" && inRange()) {
-        for (const fn of strikeListeners)
-          fn({ move: name, damage: move.damage });
+      if (state === "strike") {
+        if (inRange()) {
+          for (const fn of strikeListeners)
+            fn({ move: name, damage: move.damage });
+        } else {
+          for (const fn of whiffListeners) fn({ move: name });
+        }
       }
       await wait(duration - STRIKE_DELAY - 150);
       target.lean = 0;
@@ -319,6 +334,7 @@ export async function createEnemy(arena, { height = 1.8 } = {}) {
     playAnim,
     playMove,
     onStrike,
+    onWhiff,
     takeHit,
     setBlocking,
     knockOut,

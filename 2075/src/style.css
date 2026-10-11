@@ -9,3 +9,21 @@ html, body {
   height: 100vh;
   background: #334;
 }
+
+.popup {
+  position: absolute;
+  left: 50%;
+  top: 35%;
+  transform: translate(-50%, -50%);
+  font: 900 72px system-ui, sans-serif;
+  text-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+  z-index: 3;
+  pointer-events: none;
+  animation: popup 0.9s ease-out forwards;
+}
+@keyframes popup {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+  15%  { opacity: 1; transform: translate(-50%, -50%) scale(1.15); }
+  30%  { transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -70%) scale(1); }
+}
