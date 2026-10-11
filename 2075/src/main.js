@@ -1,60 +1,33 @@
-import './style.css'
-import heroImg from './assets/hero.png'
-import javascriptLogo from './assets/javascript.svg'
-import viteLogo from './assets/vite.svg'
-import { setupCounter } from './counter.js'
+import { startCamera, createPose, drawSkeleton, LM } from "./player/pose.js";
 
-document.querySelector('#app').innerHTML = `
-<section id="center">
-  <div class="hero">
-    <img src="${heroImg}" class="base" width="170" height="179">
-    <img src="${javascriptLogo}" class="framework" alt="JavaScript logo"/>
-    <img src="${viteLogo}" class="vite" alt="Vite logo" />
-  </div>
-  <div>
-    <h1>Get started</h1>
-    <p>Edit <code>src/main.js</code> and save to test <code>HMR</code></p>
-  </div>
-  <button id="counter" type="button" class="counter"></button>
-</section>
+const video = document.getElementById("cam");
+const canvas = document.getElementById("skeleton");
+const debug = document.getElementById("debug");
 
-<div class="ticks"></div>
+export const player = { landmarks: null, t: 0 }; // detection code reads this next
 
-<section id="next-steps">
-  <div id="docs">
-    <svg class="icon" role="presentation" aria-hidden="true"><use href="/icons.svg#documentation-icon"></use></svg>
-    <h2>Documentation</h2>
-    <p>Your questions, answered</p>
-    <ul>
-      <li>
-        <a href="https://vite.dev/" target="_blank">
-          <img class="logo" src="${viteLogo}" alt="" />
-          Explore Vite
-        </a>
-      </li>
-      <li>
-        <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript" target="_blank">
-          <img class="button-icon" src="${javascriptLogo}" alt="">
-          Learn more
-        </a>
-      </li>
-    </ul>
-  </div>
-  <div id="social">
-    <svg class="icon" role="presentation" aria-hidden="true"><use href="/icons.svg#social-icon"></use></svg>
-    <h2>Connect with us</h2>
-    <p>Join the Vite community</p>
-    <ul>
-      <li><a href="https://github.com/vitejs/vite" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#github-icon"></use></svg>GitHub</a></li>
-      <li><a href="https://chat.vite.dev/" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#discord-icon"></use></svg>Discord</a></li>
-      <li><a href="https://x.com/vite_js" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#x-icon"></use></svg>X.com</a></li>
-      <li><a href="https://bsky.app/profile/vite.dev" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#bluesky-icon"></use></svg>Bluesky</a></li>
-    </ul>
-  </div>
-</section>
+async function init() {
+  await startCamera(video);
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const pose = await createPose();
 
-<div class="ticks"></div>
-<section id="spacer"></section>
-`
-
-setupCounter(document.querySelector('#counter'))
+  let lastVideoTime = -1;
+  function loop() {
+    if (video.currentTime !== lastVideoTime) {
+      lastVideoTime = video.currentTime;
+      const now = performance.now();
+      const result = pose.detectForVideo(video, now);
+      player.landmarks = result.landmarks?.[0] ?? null;
+      player.t = now;
+      drawSkeleton(canvas, result);
+      if (player.landmarks) {
+        const w = player.landmarks[LM.R_WRIST];
+        debug.textContent = `R wrist x:${w.x.toFixed(2)} y:${w.y.toFixed(2)} z:${w.z.toFixed(2)}`;
+      }
+    }
+    requestAnimationFrame(loop);
+  }
+  loop();
+}
+init();
