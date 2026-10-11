@@ -9,12 +9,19 @@ const video = document.getElementById("cam");
 const canvas = document.getElementById("skeleton");
 const debug = document.getElementById("debug");
 const hud = createHud(document.getElementById("hud"));
-window.addEventListener('mousemove', (e) => enemy.setPlayerX(e.clientX / window.innerWidth));
+
 async function init() {
   // ---- Real enemy (Person B) ----
   const arena = createArena(document.getElementById("stage"));
   const enemy = await createEnemy(arena);
-  enemy.say = (text) => hud.showSubtitle(text); // temporary until the voice step
+  enemy.say = (text) => {
+    hud.showSubtitle(text);
+    const u = new SpeechSynthesisUtterance(text);
+    u.pitch = 0.6;
+    speechSynthesis.cancel();
+    speechSynthesis.speak(u);
+  };
+  window.addEventListener('mousemove', (e) => enemy.setPlayerX(e.clientX / window.innerWidth));
 
   // ---- Game (Person A) ----
   let game; // set below, since moves needs to call game.handlePunch
