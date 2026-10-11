@@ -12,6 +12,8 @@
     "vite": "^8.3.0"
   },
   "dependencies": {
+    "@mediapipe/tasks-vision": "^1.1.0",
+    "mediapipe": "^0.0.1-security",
     "three": "^0.186.1"
   }
 }
